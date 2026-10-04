@@ -61,3 +61,14 @@ export async function submitRelease(payload: { version: string; accepted: string
   await new Promise((resolve) => setTimeout(resolve, 220));
   return { accepted: true, releaseId: `DS-${payload.version}-${Date.now().toString().slice(-4)}` };
 }
+
+// 强制结束旧版本是管理员专属操作，服务端按角色鉴权，越权一律 403 拒绝。
+export async function postForceEnd(payload: { version: string; actor: string; role: 'admin' | 'maintainer' }) {
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  if (payload.role !== 'admin') {
+    const error = new Error('仅设计系统管理员可强制结束旧版本') as Error & { status?: number };
+    error.status = 403;
+    throw error;
+  }
+  return { accepted: true, version: payload.version, endedAt: Date.now() };
+}

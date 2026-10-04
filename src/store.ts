@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { collectDependents, useReconcileStore } from './reconcile';
 
 export type TokenCategory = 'color' | 'font' | 'spacing' | 'radius' | 'shadow' | 'component';
 export type Token = {
@@ -148,9 +149,19 @@ export const useTokenStore = defineStore('tokens', {
       const change = this.changes.find((item) => item.id === id);
       if (!change) return;
       const token = this.tokens.find((item) => item.id === change.diff.token);
-      if (token) this.updateTokenValue(token.id, change.diff.after);
+      if (token) {
+        this.updateTokenValue(token.id, change.diff.after);
+        this.notifyTokenChange(token);
+      }
       change.status = '已接受';
       this.persist();
+    },
+    // 基础令牌（无引用）或组件别名改动后，通知对账台按新快照失效重算受影响产品。
+    notifyTokenChange(token: Token) {
+      if (token.ref && token.category !== 'component') return;
+      const reconcile = useReconcileStore();
+      const affected = [token.id, ...collectDependents(this.tokens, token.id)];
+      reconcile.registerTokenChange(token.id, affected, Object.fromEntries(this.tokens.map((item) => [item.id, item.value])));
     },
     rejectChange(id: string) {
       const change = this.changes.find((item) => item.id === id);
@@ -168,6 +179,8 @@ export const useTokenStore = defineStore('tokens', {
       if (this.cycleNodes.length === 0 && this.invalidReferences.length === 0 && this.contrastIssues.length === 0 && this.changes.every((item) => item.status !== '待评审')) {
         this.locked = true;
         this.lastPublished = `DS ${this.releaseVersion}`;
+        const reconcile = useReconcileStore();
+        reconcile.publishRelease(this.releaseVersion, Object.fromEntries(this.tokens.map((item) => [item.id, item.value])));
       }
       this.persist();
     },

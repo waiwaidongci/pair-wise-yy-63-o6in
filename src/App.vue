@@ -14,8 +14,10 @@ import {
   SwapIcon
 } from 'tdesign-icons-vue-next';
 import TokenEditor from './components/TokenEditor.vue';
+import ReconcileConsole from './components/ReconcileConsole.vue';
 import { fetchTokens, submitRelease, type Token } from './api';
 import { useTokenStore } from './store';
+import { useReconcileStore } from './reconcile';
 
 const AddButtonIcon = () => h(AddIcon);
 const ArrowRightButtonIcon = () => h(ArrowRightIcon);
@@ -29,6 +31,7 @@ const SwapButtonIcon = () => h(SwapIcon);
 const route = useRoute();
 const router = useRouter();
 const store = useTokenStore();
+const reconcile = useReconcileStore();
 const { data: remote } = useQuery({ queryKey: ['tokens'], queryFn: fetchTokens });
 const selectedVersion = ref(store.releaseVersion);
 const batchFrom = ref('');
@@ -42,7 +45,8 @@ const nav = [
   { path: '/', label: '令牌工作区', icon: 'token' },
   { path: '/graph', label: '依赖与校验', icon: 'control-platform' },
   { path: '/review', label: '变更评审', icon: 'git-commit' },
-  { path: '/publish', label: '主题发布', icon: 'send' }
+  { path: '/publish', label: '主题发布', icon: 'send' },
+  { path: '/reconcile', label: '发布对账台', icon: 'task-checked' }
 ];
 
 const pageTitle = computed(() => nav.find((item) => item.path === route.path)?.label ?? '令牌工作区');
@@ -158,7 +162,7 @@ function publish() {
     <t-layout class="body-layout">
       <t-aside class="side-nav">
         <div class="workspace-card"><t-icon name="layers" /><div><span>当前工作区</span><strong>通用组件库 · 品牌主题</strong><small>15 个令牌 · 4 个主题变体</small></div></div>
-        <nav><button v-for="item in nav" :key="item.path" :class="{ active: route.path === item.path }" @click="go(item.path)"><t-icon :name="item.icon" /><span>{{ item.label }}</span><t-badge v-if="item.path === '/review'" :count="store.changes.filter(c => c.status === '待评审').length" /></button></nav>
+        <nav><button v-for="item in nav" :key="item.path" :class="{ active: route.path === item.path }" @click="go(item.path)"><t-icon :name="item.icon" /><span>{{ item.label }}</span><t-badge v-if="item.path === '/review'" :count="store.changes.filter(c => c.status === '待评审').length" /><t-badge v-if="item.path === '/reconcile'" :count="reconcile.deviations.length" /></button></nav>
         <div class="save-state"><t-icon name="cloud-done" /><div><span>草稿已保存</span><small>{{ new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) }}</small></div></div>
       </t-aside>
       <t-content class="main-content">
@@ -226,6 +230,10 @@ function publish() {
               <div class="change-actions"><t-button variant="outline" :disabled="change.status !== '待评审'" @click="store.rejectChange(change.id)">退回并说明</t-button><t-button theme="primary" :disabled="change.status !== '待评审'" @click="store.acceptChange(change.id)">接受变更</t-button></div>
             </div>
           </div>
+        </section>
+
+        <section v-else-if="route.path === '/reconcile'" class="reconcile-wrap">
+          <ReconcileConsole />
         </section>
 
         <section v-else class="publish-page">
